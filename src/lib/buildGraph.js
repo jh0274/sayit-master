@@ -36,7 +36,6 @@ export default function buildGraph(entryWord, entryId, MAX_DEPTH, progress) {
       fetchNextConcept(entryWord, entryId);
     } else{
       console.log("ERROR")
-      fetchNext(entryWord);
     }
   }
 
@@ -82,40 +81,6 @@ export default function buildGraph(entryWord, entryId, MAX_DEPTH, progress) {
     setTimeout(loadNextConcept, requestDelay);
   }
 
-  function loadSiblings(results) {
-    const parent = results[0];
-    console.log("parent", parent)
-    var parentNode = graph.getNode(parent);
-
-    if (!parentNode) {
-      parentNode = graph.addNode(parent, {
-        depth: 0,
-        size: redditDataClient.getSize(parent)
-      });
-    }
-
-    results.forEach((other, idx) => {
-      if (idx === 0) return;
-
-      const hasOtherNode = graph.hasNode(other);
-      if (hasOtherNode) {
-        console.log("hasothernode", hasOtherNode)
-        const hasOtherLink = graph.getLink(other, parent) || graph.getLink(parent, other);
-        if (!hasOtherLink) {
-          graph.addLink(parent, other);
-        }
-        return;
-      }
-
-      let depth = parentNode.data.depth + 1;
-      graph.addNode(other, {depth, size: redditDataClient.getSize(other)});
-      graph.addLink(parent, other);
-      if (depth < MAX_DEPTH) queue.push(other);
-    });
-
-    setTimeout(loadNext, requestDelay);
-  }
-
   function loadNextConcept(){
     if (cancelled) return;
     if (queue.length === 0) {
@@ -129,19 +94,6 @@ export default function buildGraph(entryWord, entryId, MAX_DEPTH, progress) {
     console.log("nextconcept", nextConcept.display_name)
     progress.updateLayout(queue.length, nextConcept.display_name);
 
-  }
-
-  function loadNext() {
-    if (cancelled) return;
-    if (queue.length === 0) {
-      bus.fire('graph-ready', graph);
-      return;
-    }
-
-    let nextWord = queue.shift();
-    fetchNext(nextWord);
-    console.log("nextword", nextWord)
-    progress.updateLayout(queue.length, nextWord);
   }
 
    async function fetchNextConcept(query, queryId){
@@ -170,30 +122,11 @@ export default function buildGraph(entryWord, entryId, MAX_DEPTH, progress) {
     onPendingReadyConcepts(concepts, queryId)
   }
 
-  function fetchNext(query) {
-    console.log("query", query)
-    pendingResponse = redditDataClient.getRelated(query);
-    console.log("fetchnext", pendingResponse);
-    pendingResponse.then(res =>
-      onPendingReady(res, query)).catch((msg) => {
-      const err = 'Failed to download ' + query + '; Message: ' + msg;
-      console.error(err);
-      progress.downloadError(err)
-      loadNext();
-    });
-  }
 
   function onPendingReadyConcepts(res, query) {
     //fill 'query' variable with 'most similar' nodes to get their children
     if (!res || !res.length) res = [query];
     //console.log("res", res)
     loadSiblingConcepts(res);
-  }
-
-  function onPendingReady(res, query) {
-    //fill 'query' variable with 'most similar' nodes to get their children
-    if (!res || !res.length) res = [query];
-    console.log("res", res)
-    loadSiblings(res);
   }
 }
